@@ -5,15 +5,15 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-console.log("API KEY LOADED:", !!process.env.APOLLO_API_KEY);
-
-// root test
-app.get("/", (req, res) => {
-  res.send("Backend working 🚀");
+const response = await fetch("https://api.apollo.io/v1/mixed_companies/search", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-Api-Key": process.env.APOLLO_API_KEY
+  },
+  body: JSON.stringify({
+    q_organization_name: "google"
+  })
 });
 
 // Apollo test route
