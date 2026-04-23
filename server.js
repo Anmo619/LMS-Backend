@@ -5,24 +5,25 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 
-console.log("API KEY:", process.env.APOLLO_API_KEY);
-
 const app = express();
 app.use(cors());
+app.use(express.json());
 
-// test root
+console.log("API KEY LOADED:", !!process.env.APOLLO_API_KEY);
+
+// root test
 app.get("/", (req, res) => {
-  res.send("Backend working");
+  res.send("Backend working 🚀");
 });
 
-// apollo test
+// Apollo test route
 app.get("/api/test", async (req, res) => {
   try {
     const response = await fetch("https://api.apollo.io/v1/organizations/search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Api-Key": process.env.APOLLO_API_KEY
+        "Authorization": `Bearer ${process.env.APOLLO_API_KEY}`
       },
       body: JSON.stringify({
         q_organization_name: "google"
@@ -30,16 +31,25 @@ app.get("/api/test", async (req, res) => {
     });
 
     const data = await response.json();
-    console.log(data);
+
+    if (!response.ok) {
+      return res.status(500).json({
+        error: "Apollo API error",
+        details: data
+      });
+    }
 
     res.json(data);
 
   } catch (error) {
-    console.error(error);
+    console.error("Apollo error:", error);
     res.status(500).json({ error: "Failed to fetch from Apollo" });
   }
 });
 
-app.listen(3000, () => {
-  console.log("Server running at http://localhost:3000");
+// IMPORTANT: Render-safe port
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
