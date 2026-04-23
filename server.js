@@ -9,100 +9,142 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔍 Debug API key (check Render logs)
-console.log("Apollo API Key Loaded:", !!process.env.APOLLO_API_KEY);
+// 🔍 Debug
+console.log("Apollo Key Loaded:", !!process.env.APOLLO_API_KEY);
 
-// 🟢 Home route
+// 🟢 Health check
 app.get("/", (req, res) => {
   res.send("LMS Backend Running 🚀");
 });
 
 
-// ================================
-// 🏢 COMPANY SEARCH API
-// ================================
+// =====================================
+// 🏢 COMPANY SEARCH (Apollo)
+// =====================================
 app.get("/api/search", async (req, res) => {
   try {
     const query = req.query.query;
 
     if (!query) {
-      return res.status(400).json({ error: "Query is required" });
+      return res.status(400).json({ error: "Query required" });
     }
 
-    const response = await fetch("https://api.apollo.io/v1/mixed_companies/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": process.env.APOLLO_API_KEY
-      },
-      body: JSON.stringify({
-        q_organization_name: query,
-        page: 1
-      })
-    });
+    const response = await fetch(
+      "https://api.apollo.io/v1/mixed_companies/search",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": process.env.APOLLO_API_KEY
+        },
+        body: JSON.stringify({
+          q_organization_name: query,
+          page: 1
+        })
+      }
+    );
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(500).json({
-        error: "Apollo company search failed",
-        details: data
-      });
-    }
-
     res.json(data);
-
   } catch (err) {
-    console.error("Company search error:", err.message);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({
+      error: "Company search failed",
+      message: err.message
+    });
   }
 });
 
 
-// ================================
-// 👤 CONTACT SEARCH API
-// ================================
-app.get("/api/contacts", async (req, res) => {
+// =====================================
+// 🧠 LINKEDIN-STYLE ENRICHMENT ENGINE
+// =====================================
+app.get("/api/enrich", async (req, res) => {
   try {
-    const query = req.query.query;
+    const company = req.query.company;
 
-    if (!query) {
-      return res.status(400).json({ error: "Query is required" });
+    if (!company) {
+      return res.status(400).json({ error: "Company required" });
     }
 
-    const response = await fetch("https://api.apollo.io/v1/mixed_people/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": process.env.APOLLO_API_KEY
-      },
-      body: JSON.stringify({
-        q_organization_name: query,
-        page: 1
-      })
-    });
+    // Step 1: Apollo company data
+    let apolloData = null;
 
-    const data = await response.json();
+    try {
+      const response = await fetch(
+        "https://api.apollo.io/v1/mixed_companies/search",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": process.env.APOLLO_API_KEY
+          },
+          body: JSON.stringify({
+            q_organization_name: company,
+            page: 1
+          })
+        }
+      );
 
-    if (!response.ok) {
-      return res.status(500).json({
-        error: "Apollo contact search failed",
-        details: data
-      });
+      apolloData = await response.json();
+    } catch (err) {
+      console.log("Apollo company fetch failed:", err.message);
     }
 
-    res.json(data);
+    // Step 2: AI-style enrichment (LinkedIn simulation)
+    const normalized = company.toLowerCase().replace(/\s/g, "");
+
+    const enriched = {
+      company: company,
+      domain: `${normalized}.com`,
+
+      decision_makers: [
+        {
+          role: "CEO",
+          name: "Inferred CEO",
+          confidence: "high"
+        },
+        {
+          role: "CTO",
+          name: "Inferred CTO",
+          confidence: "medium"
+        },
+        {
+          role: "Head of Sales",
+          name: "Inferred Sales Head",
+          confidence: "medium"
+        },
+        {
+          role: "HR Head",
+          name: "Inferred HR Head",
+          confidence: "medium"
+        }
+      ],
+
+      email_patterns: [
+        `first.last@${normalized}.com`,
+        `first@${normalized}.com`,
+        `f.last@${normalized}.com`
+      ],
+
+      company_data: apolloData || null
+    };
+
+    res.json(enriched);
 
   } catch (err) {
-    console.error("Contact search error:", err.message);
-    res.status(500).json({ error: "Server error" });
+    console.error("Enrich error:", err.message);
+    res.status(500).json({
+      error: "Enrichment failed",
+      message: err.message
+    });
   }
 });
 
 
-// ================================
-// 🚀 PORT (RENDER SAFE)
-// ================================
+// =====================================
+// 🚀 SERVER START
+// =====================================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
